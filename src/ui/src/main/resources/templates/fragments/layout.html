@@ -1,0 +1,127 @@
+<!doctype html>
+<html
+  xmlns:th="http://www.thymeleaf.org"
+  th:fragment="layout (template, menu)"
+  th:replace="~{fragments/bare :: bare (~{::body})}"
+>
+  <body>
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+      <div class="max-w-6xl mx-auto px-4">
+        <div class="flex justify-between items-center h-16">
+          <a th:href="@{/}" class="flex items-center">
+            <i class="fas fa-shopping-bag text-2xl text-primary-500"></i>
+            <span class="ml-2 text-xl font-bold text-gray-800">EKS Store</span>
+          </a>
+          <div class="hidden md:flex items-center space-x-8">
+            <a
+              id="menu-home"
+              th:href="@{/}"
+              class="hover:text-primary-500 transition duration-300 text-sm font-medium relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-primary-500 after:transition-all after:duration-300"
+              th:text="#{nav.home}"
+              >Home</a
+            >
+            <a
+              id="menu-catalog"
+              th:href="@{/catalog}"
+              class="hover:text-primary-500 transition duration-300 text-sm font-medium relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-primary-500 after:transition-all after:duration-300"
+              th:text="#{nav.catalog}"
+              >Catalog</a
+            >
+            <a
+              id="menu-topology"
+              th:href="@{/topology}"
+              class="hover:text-primary-500 transition duration-300 text-sm font-medium relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-primary-500 after:transition-all after:duration-300"
+              th:text="#{nav.topology}"
+              >Topology</a
+            >
+          </div>
+          <!-- Cart Button with Count -->
+          <div class="flex items-center space-x-4">
+            <div class="relative group">
+              <button class="text-gray-500 hover:text-primary-500 transition duration-300">
+                <i class="fas fa-palette"></i>
+              </button>
+              <div class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 hidden group-hover:block">
+                <a href="#" onclick="setTheme('default')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Default Theme</a>
+                <a href="#" onclick="setTheme('orange')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Orange Theme</a>
+                <a href="#" onclick="setTheme('green')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Green Theme</a>
+              </div>
+            </div>
+            <a th:href="@{/cart}" id="go-cart" class="relative group">
+              <button
+                class="flex items-center gap-2 p-2 text-gray-700 hover:text-primary-500 transition duration-300"
+              >
+                <i class="fas fa-shopping-cart text-lg"></i>
+                <span
+                  class="bg-primary-500 text-white text-xs rounded-full h-5 min-w-[1.25rem] flex items-center justify-center switch-other group-hover:bg-primary-600 transition duration-300"
+                  th:text="${cart.numItems}"
+                >
+                  0
+                </span>
+              </button>
+            </a>
+            <!-- Mobile menu button -->
+            <button class="md:hidden text-gray-500 hover:text-primary-500 focus:outline-none" id="mobile-menu-button">
+              <i class="fas fa-bars text-xl"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- Mobile menu -->
+      <div class="md:hidden hidden bg-white border-t border-gray-100 py-2" id="mobile-menu">
+        <div class="flex flex-col space-y-2 px-4">
+          <a
+            th:href="@{/}"
+            class="py-2 hover:text-primary-500 transition duration-300 text-sm font-medium"
+            th:text="#{nav.home}"
+            >Home</a
+          >
+          <a
+            th:href="@{/catalog}"
+            class="py-2 hover:text-primary-500 transition duration-300 text-sm font-medium"
+            th:text="#{nav.catalog}"
+            >Catalog</a
+          >
+          <a
+            th:href="@{/topology}"
+            class="py-2 hover:text-primary-500 transition duration-300 text-sm font-medium"
+            th:text="#{nav.topology}"
+            >Topology</a
+          >
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow">
+      <!-- Content goes here -->
+      <th:block th:insert="${template}" />
+    </main>
+
+    <script>
+      // Mobile menu toggle
+      document.getElementById('mobile-menu-button').addEventListener('click', function() {
+        const mobileMenu = document.getElementById('mobile-menu');
+        mobileMenu.classList.toggle('hidden');
+      });
+      
+      // Theme switcher
+      function setTheme(theme) {
+        const link = document.querySelector('link[href*="theme-"]');
+        if (link) {
+          link.href = link.href.replace(/theme-[^\.]+/, 'theme-' + theme);
+          localStorage.setItem('theme', theme);
+        }
+      }
+      
+      // Load theme from local storage
+      document.addEventListener('DOMContentLoaded', function() {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+          setTheme(savedTheme);
+        }
+      });
+    </script>
+  </body>
+</html>
