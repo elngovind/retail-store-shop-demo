@@ -8,7 +8,24 @@ This guide provides detailed instructions for setting up an Amazon EKS cluster w
 - kubectl command-line tool
 - An existing VPC with public and private subnets
 
-## Step 1: Install kubectl on Ubuntu
+## Step 1: Install AWS CLI
+
+```bash
+# Download and install AWS CLI
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+sudo apt-get install -y unzip
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Verify installation
+aws --version
+
+# Configure AWS CLI
+aws configure
+# Enter your AWS Access Key ID, Secret Access Key, region (us-east-1), and output format (json)
+```
+
+## Step 2: Install kubectl on Ubuntu
 
 ```bash
 # Download kubectl binary from Amazon EKS (amd64 architecture)
@@ -28,7 +45,7 @@ echo 'export PATH=$HOME/bin:$PATH' >> ~/.bashrc
 kubectl version --client
 ```
 
-## Step 2: Create IAM Roles for EKS
+## Step 3: Create IAM Roles for EKS
 
 ```bash
 # Create EKS cluster role
@@ -82,7 +99,7 @@ aws iam attach-role-policy \
   --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
 ```
 
-## Step 3: Create EKS Cluster
+## Step 4: Create EKS Cluster
 
 ```bash
 # Set variables
@@ -96,7 +113,7 @@ aws eks create-cluster \
   --name scaler-eks-cluster \
   --role-arn $CLUSTER_ROLE_ARN \
   --resources-vpc-config subnetIds=$PUBLIC_SUBNET_1,$PUBLIC_SUBNET_2,securityGroupIds= \
-  --kubernetes-version 1.27
+  --kubernetes-version 1.33
 
 # Wait for cluster to be created (this may take 10-15 minutes)
 aws eks wait cluster-active --name scaler-eks-cluster
@@ -108,11 +125,11 @@ aws eks update-kubeconfig --name scaler-eks-cluster --region us-east-1
 kubectl get svc
 ```
 
-## Step 4: Launch EC2 Instances for Worker Nodes
+## Step 5: Launch EC2 Instances for Worker Nodes
 
 ```bash
 # Get the latest Amazon Linux 2 AMI optimized for EKS
-AMI_ID=$(aws ssm get-parameter --name /aws/service/eks/optimized-ami/1.27/amazon-linux-2/recommended/image_id --query "Parameter.Value" --output text)
+AMI_ID=$(aws ssm get-parameter --name /aws/service/eks/optimized-ami/1.33/amazon-linux-2/recommended/image_id --query "Parameter.Value" --output text)
 
 # Create security group for worker nodes
 SECURITY_GROUP_ID=$(aws ec2 create-security-group \
@@ -200,7 +217,7 @@ aws ec2 wait instance-running --instance-ids $INSTANCE_1_ID $INSTANCE_2_ID
 echo "EC2 instances launched: $INSTANCE_1_ID $INSTANCE_2_ID"
 ```
 
-## Step 5: Configure Worker Nodes to Join the EKS Cluster
+## Step 6: Configure Worker Nodes to Join the EKS Cluster
 
 ```bash
 # Create aws-auth ConfigMap to allow worker nodes to join the cluster
@@ -230,7 +247,7 @@ sleep 60
 kubectl get nodes
 ```
 
-## Step 6: Deploy the Retail Store Application
+## Step 7: Deploy the Retail Store Application
 
 ```bash
 # Create ECR repositories for each service
@@ -256,7 +273,7 @@ kubectl get pods -n retail-store
 kubectl get services -n retail-store
 ```
 
-## Step 7: Access the Application
+## Step 8: Access the Application
 
 ```bash
 # Get the external URL for the UI service
