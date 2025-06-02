@@ -9,40 +9,101 @@ This guide provides step-by-step instructions for deploying the Retail Store Dem
 - Git repository cloned: `https://github.com/elngovind/retail-store-shop-demo.git`
 - AWS CLI installed and configured
 
-## Step 1: Create an Amazon EKS Cluster
+## Step 1: Create an Amazon EKS Cluster using AWS CLI
 
-1. **Sign in to AWS Console**
-   - Go to https://console.aws.amazon.com
-   - Sign in with your AWS account
+```bash
+# Set variables
+CLUSTER_NAME="retail-store-cluster"
+REGION="us-east-1"
+VPC_ID="vpc-00ca5a956e4f124f2"
+PUBLIC_SUBNET_1="subnet-01c39edbf3f4c6b5b"
+PUBLIC_SUBNET_2="subnet-0c75f1b5695348705"
 
-2. **Create EKS Cluster**
-   - Navigate to Amazon EKS service
-   - Click "Create cluster"
-   - Enter cluster name: `retail-store-cluster`
-   - Select Kubernetes version: `1.27` or latest
-   - Configure networking:
-     - Create new VPC or select existing
-     - Select at least 2 subnets in different AZs
-   - Configure security:
-     - Create new IAM role or use existing with EKS permissions
-   - Review and create cluster (takes ~15 minutes)
+# Create IAM role for EKS cluster
+aws iam create-role \
+  --role-name EKSClusterRole \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "eks.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  }'
 
-## Step 2: Create Node Group
+# Attach required policy to the role
+aws iam attach-role-policy \
+  --role-name EKSClusterRole \
+  --policy-arn arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
 
-1. **Add Node Group to Cluster**
-   - In your cluster, go to "Compute" tab
-   - Click "Add node group"
-   - Name: `retail-store-nodes`
-   - Create IAM role for nodes with these policies:
-     - AmazonEKSWorkerNodePolicy
-     - AmazonEKS_CNI_Policy
-     - AmazonEC2ContainerRegistryReadOnly
-   - Instance type: `t3.medium`
-   - Disk size: `20` GB
-   - Desired capacity: `2` nodes
-   - Maximum size: `4` nodes
-   - Minimum size: `1` node
-   - Create node group (takes ~5 minutes)
+# Get the role ARN
+CLUSTER_ROLE_ARN=$(aws iam get-role --role-name EKSClusterRole --query "Role.Arn" --output text)
+
+# Create EKS cluster
+aws eks create-cluster \
+  --name $CLUSTER_NAME \
+  --role-arn $CLUSTER_ROLE_ARN \
+  --resources-vpc-config subnetIds=$PUBLIC_SUBNET_1,$PUBLIC_SUBNET_2 \
+  --kubernetes-version 1.33
+
+# Wait for cluster to be created (this takes 10-15 minutes)
+aws eks wait cluster-active --name $CLUSTER_NAME
+```
+
+## Step 2: Create Node Group using AWS CLI
+
+```bash
+# Create IAM role for worker nodes
+aws iam create-role \
+  --role-name EKSNodeRole \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "ec2.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  }'
+
+# Attach required policies to the node role
+aws iam attach-role-policy \
+  --role-name EKSNodeRole \
+  --policy-arn arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+
+aws iam attach-role-policy \
+  --role-name EKSNodeRole \
+  --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+
+aws iam attach-role-policy \
+  --role-name EKSNodeRole \
+  --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+
+# Get the node role ARN
+NODE_ROLE_ARN=$(aws iam get-role --role-name EKSNodeRole --query "Role.Arn" --output text)
+
+# Create node group
+aws eks create-nodegroup \
+  --cluster-name $CLUSTER_NAME \
+  --nodegroup-name retail-store-nodes \
+  --node-role $NODE_ROLE_ARN \
+  --subnets $PUBLIC_SUBNET_1 $PUBLIC_SUBNET_2 \
+  --instance-types t3.medium \
+  --disk-size 20 \
+  --scaling-config minSize=1,maxSize=4,desiredSize=2
+
+# Wait for node group to be created (this takes 3-5 minutes)
+aws eks wait nodegroup-active \
+  --cluster-name $CLUSTER_NAME \
+  --nodegroup-name retail-store-nodes
+```
 
 ## Step 3: Configure kubectl to Connect to Your Cluster
 
