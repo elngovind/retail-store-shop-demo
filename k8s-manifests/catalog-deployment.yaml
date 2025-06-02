@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog
+  namespace: retail-store
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: catalog
+  template:
+    metadata:
+      labels:
+        app: catalog
+    spec:
+      containers:
+      - name: catalog
+        image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/retail-store/catalog:latest
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog
+  namespace: retail-store
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: catalog
