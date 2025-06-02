@@ -7,6 +7,7 @@ This guide provides step-by-step instructions for deploying the Retail Store Dem
 - AWS Account with appropriate permissions
 - Docker installed locally
 - Git repository cloned: `https://github.com/elngovind/retail-store-shop-demo.git`
+- AWS CLI installed and configured
 
 ## Step 1: Create an Amazon EKS Cluster
 
@@ -68,243 +69,175 @@ This guide provides step-by-step instructions for deploying the Retail Store Dem
      - `retail-store/checkout`
      - `retail-store/orders`
 
+   Alternatively, use AWS CLI to create all repositories:
+   ```bash
+   aws ecr create-repository --repository-name retail-store/ui
+   aws ecr create-repository --repository-name retail-store/catalog
+   aws ecr create-repository --repository-name retail-store/cart
+   aws ecr create-repository --repository-name retail-store/checkout
+   aws ecr create-repository --repository-name retail-store/orders
+   ```
+
 ## Step 5: Build and Push Docker Images
 
-1. **Build Docker Images Locally**
+Each service has its own Dockerfile in its respective directory. You can build and push them individually or use the script below to automate the process.
+
+### Option 1: Automated Script
+
+Create a file named `build-and-push.sh` in the repository root:
+
+```bash
+#!/bin/bash
+
+# Set your AWS account ID and region
+export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export AWS_REGION=$(aws configure get region)
+
+echo "Using AWS Account ID: $AWS_ACCOUNT_ID"
+echo "Using AWS Region: $AWS_REGION"
+
+# Login to ECR
+echo "Logging in to Amazon ECR..."
+aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+# Build and push each service
+SERVICES=("ui" "catalog" "cart" "checkout" "orders")
+
+for SERVICE in "${SERVICES[@]}"; do
+  echo "Building $SERVICE service..."
+  cd src/$SERVICE
+  docker build -t retail-store/$SERVICE:latest .
+  
+  echo "Tagging $SERVICE image..."
+  docker tag retail-store/$SERVICE:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/$SERVICE:latest
+  
+  echo "Pushing $SERVICE image to ECR..."
+  docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/$SERVICE:latest
+  
+  cd ../..
+  echo "$SERVICE service pushed to ECR successfully"
+  echo "-------------------------------------------"
+done
+
+echo "All services built and pushed to ECR"
+```
+
+Make the script executable and run it:
+```bash
+chmod +x build-and-push.sh
+./build-and-push.sh
+```
+
+### Option 2: Manual Build and Push
+
+Build and push each service individually:
+
+#### UI Service
+```bash
+# Build UI image
+cd src/ui
+docker build -t retail-store/ui:latest .
+
+# Tag and push to ECR
+aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+docker tag retail-store/ui:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/ui:latest
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/ui:latest
+cd ..
+```
+
+#### Catalog Service
+```bash
+# Build Catalog image
+cd src/catalog
+docker build -t retail-store/catalog:latest .
+
+# Tag and push to ECR
+docker tag retail-store/catalog:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/catalog:latest
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/catalog:latest
+cd ..
+```
+
+#### Cart Service
+```bash
+# Build Cart image
+cd src/cart
+docker build -t retail-store/cart:latest .
+
+# Tag and push to ECR
+docker tag retail-store/cart:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/cart:latest
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/cart:latest
+cd ..
+```
+
+#### Checkout Service
+```bash
+# Build Checkout image
+cd src/checkout
+docker build -t retail-store/checkout:latest .
+
+# Tag and push to ECR
+docker tag retail-store/checkout:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/checkout:latest
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/checkout:latest
+cd ..
+```
+
+#### Orders Service
+```bash
+# Build Orders image
+cd src/orders
+docker build -t retail-store/orders:latest .
+
+# Tag and push to ECR
+docker tag retail-store/orders:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/orders:latest
+docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/retail-store/orders:latest
+cd ..
+```
+
+## Step 6: Deploy Using Kubernetes Manifests
+
+The repository includes pre-configured Kubernetes manifests in the `k8s-manifests` directory. You can use the provided `deploy.sh` script to automatically deploy all services.
+
+### Option 1: Using the Deployment Script
+
+```bash
+cd k8s-manifests
+./deploy.sh
+```
+
+This script will:
+1. Detect your AWS account ID and region
+2. Replace placeholders in the YAML files
+3. Apply all the Kubernetes manifests in the correct order
+
+### Option 2: Manual Deployment
+
+If you prefer to deploy manually:
+
+1. **Update Image URLs in Manifests**
+   
+   Replace `${AWS_ACCOUNT_ID}` and `${AWS_REGION}` in the YAML files with your actual values:
    ```bash
-   cd /path/to/retail-store-shop-demo
-   docker build -t ui:latest ./src/ui
-   docker build -t catalog:latest ./src/catalog
-   docker build -t cart:latest ./src/cart
-   docker build -t checkout:latest ./src/checkout
-   docker build -t orders:latest ./src/orders
+   export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+   export AWS_REGION=$(aws configure get region)
+   
+   # Replace placeholders in YAML files
+   for file in k8s-manifests/*.yaml; do
+     sed -i '' "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" "$file"
+     sed -i '' "s/\${AWS_REGION}/$AWS_REGION/g" "$file"
+   done
    ```
 
-2. **Push Images to ECR**
-   - Click "View push commands" in each ECR repository
-   - Follow the instructions to tag and push each image
-
-## Step 6: Create Kubernetes Manifests
-
-Save the following YAML files to your repository:
-
-### Namespace
-```yaml
-# retail-namespace.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: retail-store
-```
-
-### UI Service
-```yaml
-# ui-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ui
-  namespace: retail-store
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: ui
-  template:
-    metadata:
-      labels:
-        app: ui
-    spec:
-      containers:
-      - name: ui
-        image: <your-account-id>.dkr.ecr.<region>.amazonaws.com/retail-store/ui:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: CATALOG_SERVICE_URL
-          value: "http://catalog:8080"
-        - name: CART_SERVICE_URL
-          value: "http://cart:8080"
-        - name: CHECKOUT_SERVICE_URL
-          value: "http://checkout:8080"
-        - name: ORDERS_SERVICE_URL
-          value: "http://orders:8080"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: ui
-  namespace: retail-store
-spec:
-  type: LoadBalancer
-  ports:
-  - port: 80
-    targetPort: 8080
-  selector:
-    app: ui
-```
-
-### Catalog Service
-```yaml
-# catalog-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: catalog
-  namespace: retail-store
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: catalog
-  template:
-    metadata:
-      labels:
-        app: catalog
-    spec:
-      containers:
-      - name: catalog
-        image: <your-account-id>.dkr.ecr.<region>.amazonaws.com/retail-store/catalog:latest
-        ports:
-        - containerPort: 8080
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: catalog
-  namespace: retail-store
-spec:
-  ports:
-  - port: 8080
-    targetPort: 8080
-  selector:
-    app: catalog
-```
-
-### Cart Service
-```yaml
-# cart-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: cart
-  namespace: retail-store
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: cart
-  template:
-    metadata:
-      labels:
-        app: cart
-    spec:
-      containers:
-      - name: cart
-        image: <your-account-id>.dkr.ecr.<region>.amazonaws.com/retail-store/cart:latest
-        ports:
-        - containerPort: 8080
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: cart
-  namespace: retail-store
-spec:
-  ports:
-  - port: 8080
-    targetPort: 8080
-  selector:
-    app: cart
-```
-
-### Checkout Service
-```yaml
-# checkout-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: checkout
-  namespace: retail-store
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: checkout
-  template:
-    metadata:
-      labels:
-        app: checkout
-    spec:
-      containers:
-      - name: checkout
-        image: <your-account-id>.dkr.ecr.<region>.amazonaws.com/retail-store/checkout:latest
-        ports:
-        - containerPort: 8080
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: checkout
-  namespace: retail-store
-spec:
-  ports:
-  - port: 8080
-    targetPort: 8080
-  selector:
-    app: checkout
-```
-
-### Orders Service
-```yaml
-# orders-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: orders
-  namespace: retail-store
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: orders
-  template:
-    metadata:
-      labels:
-        app: orders
-    spec:
-      containers:
-      - name: orders
-        image: <your-account-id>.dkr.ecr.<region>.amazonaws.com/retail-store/orders:latest
-        ports:
-        - containerPort: 8080
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: orders
-  namespace: retail-store
-spec:
-  ports:
-  - port: 8080
-    targetPort: 8080
-  selector:
-    app: orders
-```
-
-## Step 7: Apply Kubernetes Manifests
-
-1. **Apply Manifests Using kubectl**
+2. **Apply Manifests Using kubectl**
    ```bash
-   kubectl apply -f retail-namespace.yaml
-   kubectl apply -f ui-deployment.yaml
-   kubectl apply -f catalog-deployment.yaml
-   kubectl apply -f cart-deployment.yaml
-   kubectl apply -f checkout-deployment.yaml
-   kubectl apply -f orders-deployment.yaml
+   kubectl apply -f k8s-manifests/retail-namespace.yaml
+   kubectl apply -f k8s-manifests/ui-deployment.yaml
+   kubectl apply -f k8s-manifests/catalog-deployment.yaml
+   kubectl apply -f k8s-manifests/cart-deployment.yaml
+   kubectl apply -f k8s-manifests/checkout-deployment.yaml
+   kubectl apply -f k8s-manifests/orders-deployment.yaml
    ```
 
-## Step 8: Verify Deployment
+## Step 7: Verify Deployment
 
 1. **Check Deployments**
    ```bash
@@ -322,42 +255,19 @@ spec:
    ```
    - Use the EXTERNAL-IP to access your application
 
-## Step 9: Configure Ingress (Optional)
+## Step 8: Configure Ingress (Optional)
 
 1. **Install NGINX Ingress Controller**
    ```bash
    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/aws/deploy.yaml
    ```
 
-2. **Create Ingress Resource**
-   ```yaml
-   # retail-ingress.yaml
-   apiVersion: networking.k8s.io/v1
-   kind: Ingress
-   metadata:
-     name: retail-ingress
-     namespace: retail-store
-     annotations:
-       kubernetes.io/ingress.class: nginx
-   spec:
-     rules:
-     - http:
-         paths:
-         - path: /
-           pathType: Prefix
-           backend:
-             service:
-               name: ui
-               port:
-                 number: 80
-   ```
-
-3. **Apply Ingress**
+2. **Apply Ingress Resource**
    ```bash
-   kubectl apply -f retail-ingress.yaml
+   kubectl apply -f k8s-manifests/retail-ingress.yaml
    ```
 
-## Step 10: Monitor Your Application
+## Step 9: Monitor Your Application
 
 1. **Check Logs**
    ```bash
