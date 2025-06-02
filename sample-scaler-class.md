@@ -11,9 +11,9 @@ This guide provides detailed instructions for setting up an Amazon EKS cluster w
 ## Step 1: Install kubectl on Ubuntu
 
 ```bash
-# Download kubectl binary from Amazon EKS
-curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.33.0/2025-05-01/bin/linux/arm64/kubectl
-curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.33.0/2025-05-01/bin/linux/arm64/kubectl.sha256
+# Download kubectl binary from Amazon EKS (amd64 architecture)
+curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.33.0/2025-05-01/bin/linux/amd64/kubectl
+curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.33.0/2025-05-01/bin/linux/amd64/kubectl.sha256
 
 # Make kubectl executable
 chmod +x ./kubectl
